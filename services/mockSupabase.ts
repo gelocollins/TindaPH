@@ -238,6 +238,16 @@ export const listingService = {
           comment: r.comment,
           created_at: r.created_at
       }));
+  },
+
+  // --- ADD REVIEW TO DB ---
+  addReview: async (review: { user_id: string, rating: number, comment: string }) => {
+     const { error } = await supabase.from('site_reviews').insert({
+         user_id: review.user_id,
+         rating: review.rating,
+         comment: review.comment
+     });
+     if (error) throw new Error(error.message);
   }
 };
 

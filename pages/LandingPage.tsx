@@ -68,6 +68,63 @@ const CountUp: React.FC<{ end: number; duration?: number; label: string }> = ({ 
   );
 };
 
+// --- REVIEW MODAL COMPONENT ---
+const ReviewModal: React.FC<{ onClose: () => void; onSubmit: (rating: number, comment: string) => Promise<void> }> = ({ onClose, onSubmit }) => {
+    const [rating, setRating] = useState(5);
+    const [comment, setComment] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSubmitting(true);
+        await onSubmit(rating, comment);
+        setSubmitting(false);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl animate-fade-in-up">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Share your experience</h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Rating</label>
+                        <div className="flex gap-2">
+                            {[1, 2, 3, 4, 5].map(star => (
+                                <button 
+                                    key={star} 
+                                    type="button"
+                                    onClick={() => setRating(star)}
+                                    className={`text-2xl transition ${star <= rating ? 'text-yellow-400 scale-110' : 'text-gray-300'}`}
+                                >
+                                    ★
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Comment</label>
+                        <textarea 
+                            value={comment}
+                            onChange={e => setComment(e.target.value)}
+                            required
+                            rows={4}
+                            className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                            placeholder="What did you like about TindaPH?"
+                        />
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                        <button type="button" onClick={onClose} className="flex-1 py-3 text-gray-600 font-bold rounded-xl hover:bg-gray-100">Cancel</button>
+                        <button type="submit" disabled={submitting} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50">
+                            {submitting ? 'Submitting...' : 'Post Review'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 // --- MAIN COMPONENT ---
 interface LandingPageProps {
   user: User | null;
@@ -78,29 +135,49 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
   const [trendingItems, setTrendingItems] = useState<Listing[]>([]);
   const [reviews, setReviews] = useState<SiteReview[]>([]);
   const [activeTab, setActiveTab] = useState<'buyer' | 'seller'>('buyer');
+  const [showReviewModal, setShowReviewModal] = useState(false);
   const navigate = useNavigate();
 
+  const fetchReviews = async () => {
+    const fetchedReviews = await listingService.getReviews();
+    setReviews(fetchedReviews);
+  };
+
   useEffect(() => {
-    // Simulate initial page load animation
     const timer = setTimeout(() => setLoading(false), 1500);
-    
-    // Fetch data
     const fetchData = async () => {
       try {
-        const [data, fetchedReviews] = await Promise.all([
-            listingService.getFeed(null),
-            listingService.getReviews()
+        const [data] = await Promise.all([
+            listingService.getFeed(null)
         ]);
         setTrendingItems(data.slice(0, 5));
-        setReviews(fetchedReviews);
+        await fetchReviews();
       } catch (e) {
         console.error("Landing data fetch error", e);
       }
     };
     fetchData();
-
     return () => clearTimeout(timer);
   }, []);
+
+  const handleReviewSubmit = async (rating: number, comment: string) => {
+      if (!user) return;
+      await listingService.addReview({
+          user_id: user.id,
+          rating,
+          comment
+      });
+      await fetchReviews();
+      alert("Review submitted! Thank you.");
+  };
+
+  const openReviewModal = () => {
+      if (!user) {
+          navigate('/login');
+      } else {
+          setShowReviewModal(true);
+      }
+  };
 
   if (loading) {
     return (
@@ -114,74 +191,74 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
     );
   }
 
-  // Fallback testimonial if no DB data
+  // Use the latest review or fallback
   const featuredReview = reviews.length > 0 ? reviews[0] : {
-      comment: "I sold my old gaming laptop in less than 24 hours. The buyer was just 3 streets away! The AI description tool saved me so much time.",
+      comment: "I sold my old gaming laptop in less than 24 hours. The buyer was just 3 streets away!",
       user_name: "Miguel Santos",
       user_location: "Quezon City",
       rating: 5
   };
 
   return (
-    <div className="overflow-hidden">
+    <div className="overflow-hidden bg-slate-50 font-sans">
       
       {/* --- HERO SECTION --- */}
-      <section className="relative min-h-[90vh] flex items-center pt-20 md:pt-0 overflow-hidden">
+      <section className="relative min-h-[90vh] flex items-center pt-24 md:pt-0 overflow-hidden">
          {/* Background Elements */}
          <div className="absolute inset-0 z-0">
             <div className="absolute top-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-blue-400/20 rounded-full blur-[100px] animate-pulse-glow" />
             <div className="absolute bottom-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-purple-400/20 rounded-full blur-[100px] animate-pulse-glow" style={{ animationDelay: '1s' }} />
          </div>
 
-         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
+         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-8 items-center">
             
-            <div className="space-y-8 text-center md:text-left">
-               <div className="inline-block px-4 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold tracking-wide animate-fade-in-up">
+            <div className="space-y-6 text-center md:text-left mt-8 md:mt-0">
+               <div className="inline-block px-4 py-1.5 rounded-full bg-blue-100 border border-blue-200 text-blue-700 text-[10px] md:text-xs font-bold tracking-wide animate-fade-in-up">
                  ✨ #1 Marketplace in the Philippines
                </div>
                
-               <h1 className="text-5xl md:text-7xl font-black text-slate-900 leading-[1.1] tracking-tight animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+               {/* RESPONSIVE FONT SIZE FIX: reduced text-5xl to text-4xl on mobile */}
+               <h1 className="text-4xl md:text-7xl font-black text-slate-900 leading-[1.1] tracking-tight animate-fade-in-up" style={{ animationDelay: '200ms' }}>
                  Buy & Sell <br/>
                  <span className="text-gradient">With Confidence.</span>
                </h1>
                
-               <p className="text-lg md:text-xl text-gray-600 max-w-lg mx-auto md:mx-0 leading-relaxed animate-fade-in-up" style={{ animationDelay: '400ms' }}>
-                 Discover thousands of items near you. From electronics to fashion, trade securely with our verified local community.
+               <p className="text-base md:text-xl text-gray-600 max-w-md mx-auto md:mx-0 leading-relaxed animate-fade-in-up px-4 md:px-0" style={{ animationDelay: '400ms' }}>
+                 Discover thousands of items near you. Trade securely with our verified local community.
                </p>
 
-               <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start pt-4 animate-fade-in-up" style={{ animationDelay: '600ms' }}>
-                  <Link to="/explore" className="px-8 py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-300 hover:bg-blue-700 hover:scale-105 transition transform flex items-center justify-center gap-2">
+               <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start pt-4 animate-fade-in-up px-6 md:px-0" style={{ animationDelay: '600ms' }}>
+                  <Link to="/explore" className="w-full sm:w-auto px-8 py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-300 hover:bg-blue-700 hover:scale-105 transition transform flex items-center justify-center gap-2">
                     Browse Marketplace
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
                   </Link>
-                  <Link to="/sell" className="px-8 py-4 bg-white text-slate-700 border border-slate-200 font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition flex items-center justify-center gap-2">
+                  <Link to="/sell" className="w-full sm:w-auto px-8 py-4 bg-white text-slate-700 border border-slate-200 font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition flex items-center justify-center gap-2">
                     Start Selling
                   </Link>
                </div>
             </div>
 
             {/* Hero Visual */}
-            <div className="relative h-[400px] md:h-[600px] flex items-center justify-center animate-fade-in-up" style={{ animationDelay: '800ms' }}>
+            <div className="relative h-[300px] md:h-[600px] flex items-center justify-center animate-fade-in-up mt-8 md:mt-0" style={{ animationDelay: '800ms' }}>
                <div className="absolute w-[80%] h-[80%] bg-gradient-to-tr from-blue-100 to-purple-100 rounded-full animate-float opacity-50"></div>
                
                {/* Floating Cards Mockup */}
-               <div className="relative z-10 w-64 md:w-80 bg-white p-4 rounded-2xl shadow-2xl animate-float-delayed border border-gray-100 rotate-[-6deg] absolute left-0 md:left-10 top-10">
-                  <div className="h-40 bg-gray-100 rounded-lg mb-3 overflow-hidden">
+               <div className="relative z-10 w-48 md:w-80 bg-white p-3 md:p-4 rounded-2xl shadow-2xl animate-float-delayed border border-gray-100 rotate-[-6deg] absolute left-4 md:left-10 top-4 md:top-10">
+                  <div className="h-28 md:h-40 bg-gray-100 rounded-lg mb-3 overflow-hidden">
                      <img src="https://picsum.photos/400/400" className="w-full h-full object-cover" />
                   </div>
-                  <div className="h-4 w-3/4 bg-gray-100 rounded mb-2"></div>
-                  <div className="h-4 w-1/2 bg-blue-100 rounded"></div>
+                  <div className="h-3 md:h-4 w-3/4 bg-gray-100 rounded mb-2"></div>
+                  <div className="h-3 md:h-4 w-1/2 bg-blue-100 rounded"></div>
                </div>
 
-               <div className="relative z-20 w-64 md:w-80 bg-white p-4 rounded-2xl shadow-2xl animate-float border border-gray-100 rotate-[3deg] translate-x-12 translate-y-20">
+               <div className="relative z-20 w-48 md:w-80 bg-white p-3 md:p-4 rounded-2xl shadow-2xl animate-float border border-gray-100 rotate-[3deg] translate-x-12 md:translate-x-12 translate-y-12 md:translate-y-20">
                   <div className="flex items-center gap-3 mb-4">
-                     <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold">✓</div>
+                     <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-sm">✓</div>
                      <div>
-                       <div className="h-3 w-24 bg-gray-100 rounded mb-1"></div>
-                       <div className="h-3 w-16 bg-gray-100 rounded"></div>
+                       <div className="h-2 md:h-3 w-20 md:w-24 bg-gray-100 rounded mb-1"></div>
+                       <div className="h-2 md:h-3 w-12 md:w-16 bg-gray-100 rounded"></div>
                      </div>
                   </div>
-                  <div className="h-40 bg-gray-100 rounded-lg overflow-hidden">
+                  <div className="h-28 md:h-40 bg-gray-100 rounded-lg overflow-hidden">
                     <img src="https://picsum.photos/400/401" className="w-full h-full object-cover" />
                   </div>
                </div>
@@ -191,9 +268,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
       </section>
 
       {/* --- STATS SECTION --- */}
-      <section className="py-20 bg-white relative z-10">
+      <section className="py-12 md:py-20 bg-white relative z-10">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
              <CountUp end={15000} label="Active Users" />
              <CountUp end={8500} label="Items Listed" />
              <CountUp end={98} label="Success Rate %" />
@@ -202,21 +279,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
       </section>
 
       {/* --- MARKETPLACE PREVIEW --- */}
-      <section className="py-24 bg-slate-50 border-t border-slate-200">
+      <section className="py-16 md:py-24 bg-slate-50 border-t border-slate-200">
          <div className="max-w-7xl mx-auto px-6">
-            <div className="flex justify-between items-end mb-12">
+            <div className="flex justify-between items-end mb-8 md:mb-12">
                <Reveal>
                  <h2 className="text-3xl md:text-4xl font-black text-slate-900">Trending Now 🔥</h2>
-                 <p className="text-slate-500 mt-2">See what everyone is looking at in your area.</p>
+                 <p className="text-slate-500 mt-2 text-sm md:text-base">See what everyone is looking at in your area.</p>
                </Reveal>
                <Link to="/explore" className="hidden md:flex text-blue-600 font-bold items-center gap-2 hover:underline">
                  View All <span className="text-xl">→</span>
                </Link>
             </div>
 
-            <div className="flex overflow-x-auto gap-6 pb-8 no-scrollbar snap-x snap-mandatory">
+            <div className="flex overflow-x-auto gap-4 md:gap-6 pb-8 no-scrollbar snap-x snap-mandatory">
                {trendingItems.length > 0 ? trendingItems.map((item, idx) => (
-                 <div key={item.id} className="min-w-[280px] md:min-w-[300px] snap-center">
+                 <div key={item.id} className="min-w-[240px] md:min-w-[300px] snap-center">
                     <Reveal delay={idx * 100}>
                        <ListingCard item={item} />
                     </Reveal>
@@ -224,8 +301,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
                )) : (
                  <div className="text-gray-400 p-8 text-center w-full">No trending items available yet. Be the first to list!</div>
                )}
-               <div className="min-w-[200px] flex items-center justify-center">
-                  <Link to="/explore" className="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center text-blue-600 hover:scale-110 transition">
+               <div className="min-w-[150px] flex items-center justify-center">
+                  <Link to="/explore" className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white shadow-lg flex items-center justify-center text-blue-600 hover:scale-110 transition">
                      ➔
                   </Link>
                </div>
@@ -234,31 +311,31 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
       </section>
 
       {/* --- FEATURES TABS --- */}
-      <section className="py-24 bg-white overflow-hidden">
+      <section className="py-16 md:py-24 bg-white overflow-hidden">
          <div className="max-w-7xl mx-auto px-6">
-            <Reveal className="text-center mb-16">
-               <span className="text-blue-600 font-bold tracking-wider text-sm uppercase">Why Choose TindaPH?</span>
-               <h2 className="text-4xl font-black text-slate-900 mt-2 mb-6">Everything you need to trade.</h2>
+            <Reveal className="text-center mb-10 md:mb-16">
+               <span className="text-blue-600 font-bold tracking-wider text-xs md:text-sm uppercase">Why Choose TindaPH?</span>
+               <h2 className="text-3xl md:text-4xl font-black text-slate-900 mt-2 mb-6">Everything you need.</h2>
                
-               <div className="inline-flex bg-slate-100 p-1.5 rounded-full">
+               <div className="inline-flex bg-slate-100 p-1 rounded-full">
                   <button 
                     onClick={() => setActiveTab('buyer')}
-                    className={`px-8 py-3 rounded-full text-sm font-bold transition-all ${activeTab === 'buyer' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-6 md:px-8 py-2 md:py-3 rounded-full text-xs md:text-sm font-bold transition-all ${activeTab === 'buyer' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
                   >
                     For Buyers
                   </button>
                   <button 
                     onClick={() => setActiveTab('seller')}
-                    className={`px-8 py-3 rounded-full text-sm font-bold transition-all ${activeTab === 'seller' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-6 md:px-8 py-2 md:py-3 rounded-full text-xs md:text-sm font-bold transition-all ${activeTab === 'seller' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
                   >
                     For Sellers
                   </button>
                </div>
             </Reveal>
 
-            <div className="grid md:grid-cols-2 gap-16 items-center">
+            <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
                <Reveal className="order-2 md:order-1">
-                  <div className="space-y-8">
+                  <div className="space-y-6 md:space-y-8">
                      {activeTab === 'buyer' ? (
                        <>
                          <FeatureItem icon="📍" title="Location-First Search" desc="Find items in your exact barangay or city. Save on shipping and meet up securely." />
@@ -275,7 +352,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
                   </div>
                </Reveal>
 
-               <div className="order-1 md:order-2 relative h-[500px] bg-slate-50 rounded-3xl overflow-hidden border border-slate-100 shadow-2xl">
+               <div className="order-1 md:order-2 relative h-[400px] md:h-[500px] bg-slate-50 rounded-3xl overflow-hidden border border-slate-100 shadow-2xl">
                   {/* Decorative UI inside the feature card */}
                   <div className="absolute inset-0 flex items-center justify-center p-8">
                      {activeTab === 'buyer' ? (
@@ -305,24 +382,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
       </section>
 
       {/* --- CATEGORIES GRID --- */}
-      <section className="py-24 bg-slate-900 text-white">
+      <section className="py-16 md:py-24 bg-slate-900 text-white">
          <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-16">
+            <div className="text-center mb-10 md:mb-16">
                <h2 className="text-3xl md:text-4xl font-black mb-4">Browse by Category</h2>
-               <p className="text-slate-400">Find exactly what you're looking for.</p>
+               <p className="text-slate-400 text-sm md:text-base">Find exactly what you're looking for.</p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                {CATEGORIES.map((cat, idx) => (
                  <Reveal key={cat} delay={idx * 50}>
                    <Link to={`/explore?category=${cat}`} className="block group relative overflow-hidden rounded-2xl aspect-[4/3] bg-slate-800 border border-slate-700 hover:border-blue-500 transition-colors">
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent opacity-80 z-10"></div>
                       <div className="absolute inset-0 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform duration-500 z-0 opacity-30">
-                         {/* Placeholder icons based on first letter logic for demo */}
                          {['📷', '👗', '🛋️', '🚗', '🎸', '🏠', '🔧', '📦'][idx % 8]}
                       </div>
-                      <div className="absolute bottom-4 left-4 z-20">
-                         <h3 className="font-bold text-lg group-hover:text-blue-400 transition-colors">{cat}</h3>
+                      <div className="absolute bottom-3 left-3 md:bottom-4 md:left-4 z-20">
+                         <h3 className="font-bold text-sm md:text-lg group-hover:text-blue-400 transition-colors">{cat}</h3>
                       </div>
                    </Link>
                  </Reveal>
@@ -331,44 +407,55 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
          </div>
       </section>
 
-      {/* --- TESTIMONIALS (DYNAMIC FROM SITE_REVIEWS) --- */}
-      <section className="py-24 bg-blue-50">
+      {/* --- TESTIMONIALS (REAL DB DATA) --- */}
+      <section className="py-16 md:py-24 bg-blue-50">
         <div className="max-w-4xl mx-auto px-6 text-center">
-           <h2 className="text-3xl font-black text-slate-900 mb-12">Trusted by Pinoys Everywhere 🇵🇭</h2>
+           <h2 className="text-2xl md:text-3xl font-black text-slate-900 mb-8 md:mb-12">Trusted by Pinoys Everywhere 🇵🇭</h2>
            
            <div className="relative bg-white p-8 md:p-12 rounded-3xl shadow-xl border border-blue-100">
-              <div className="text-4xl text-blue-200 absolute top-8 left-8">“</div>
-              <p className="text-xl md:text-2xl text-slate-700 font-medium leading-relaxed relative z-10">
+              <div className="text-4xl text-blue-200 absolute top-6 left-6 md:top-8 md:left-8">“</div>
+              
+              <div className="mb-4 text-yellow-400 text-2xl">
+                {'★'.repeat(featuredReview.rating)}{'☆'.repeat(5 - featuredReview.rating)}
+              </div>
+              
+              <p className="text-lg md:text-2xl text-slate-700 font-medium leading-relaxed relative z-10">
                  {featuredReview.comment}
               </p>
+              
               <div className="mt-8 flex items-center justify-center gap-4">
-                 <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                 <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg md:text-xl">
                     {featuredReview.user_name.charAt(0).toUpperCase()}
                  </div>
                  <div className="text-left">
-                    <p className="font-bold text-slate-900">{featuredReview.user_name}</p>
-                    <p className="text-sm text-slate-500">{featuredReview.user_location}</p>
+                    <p className="font-bold text-slate-900 text-sm md:text-base">{featuredReview.user_name}</p>
+                    <p className="text-xs md:text-sm text-slate-500">{featuredReview.user_location}</p>
                  </div>
               </div>
-              
-              {reviews.length > 1 && (
-                  <p className="text-xs text-gray-400 mt-6">Reading latest review from our community.</p>
-              )}
+
+              <div className="mt-8 pt-6 border-t border-gray-100">
+                  <button 
+                    onClick={openReviewModal}
+                    className="text-blue-600 font-bold text-sm hover:underline"
+                  >
+                    Write a Review
+                  </button>
+              </div>
            </div>
         </div>
       </section>
 
       {/* --- FOOTER CTA --- */}
-      <section className="py-24 bg-white relative overflow-hidden">
+      <section className="py-16 md:py-24 bg-white relative overflow-hidden">
          <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-purple-700 opacity-95"></div>
          <div className="relative z-10 max-w-4xl mx-auto px-6 text-center text-white">
-            <h2 className="text-4xl md:text-5xl font-black mb-6">Ready to declutter?</h2>
-            <p className="text-blue-100 text-lg mb-10">Join thousands of verified sellers turning their unused items into cash today.</p>
+            <h2 className="text-3xl md:text-5xl font-black mb-6">Ready to declutter?</h2>
+            <p className="text-blue-100 text-base md:text-lg mb-10">Join thousands of verified sellers turning their unused items into cash today.</p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
-               <Link to="/sell" className="px-10 py-5 bg-white text-blue-700 font-black rounded-full shadow-2xl hover:bg-blue-50 hover:scale-105 transition transform">
+               <Link to="/sell" className="px-10 py-4 md:py-5 bg-white text-blue-700 font-black rounded-full shadow-2xl hover:bg-blue-50 hover:scale-105 transition transform">
                  Start Selling Now
                </Link>
-               <Link to="/explore" className="px-10 py-5 bg-transparent border-2 border-white text-white font-bold rounded-full hover:bg-white/10 transition">
+               <Link to="/explore" className="px-10 py-4 md:py-5 bg-transparent border-2 border-white text-white font-bold rounded-full hover:bg-white/10 transition">
                  Explore Deals
                </Link>
             </div>
@@ -376,9 +463,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
       </section>
 
       {/* Footer Links */}
-      <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800">
-         <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-4 gap-8 text-sm">
-            <div>
+      <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800 pb-24 md:pb-12">
+         <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
+            <div className="col-span-2 md:col-span-1">
                <h3 className="text-white font-black text-xl mb-4">TindaPH.</h3>
                <p>© 2024 TindaPH Inc.<br/>Made for the Philippines 🇵🇭</p>
             </div>
@@ -386,8 +473,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
                <h4 className="text-white font-bold mb-4">Marketplace</h4>
                <ul className="space-y-2">
                   <li><Link to="/explore" className="hover:text-white">All Listings</Link></li>
-                  <li><Link to="/explore?cat=Electronics" className="hover:text-white">Electronics</Link></li>
-                  <li><Link to="/explore?cat=Fashion" className="hover:text-white">Fashion</Link></li>
+                  <li><Link to="/explore?category=Electronics" className="hover:text-white">Electronics</Link></li>
+                  <li><Link to="/explore?category=Fashion" className="hover:text-white">Fashion</Link></li>
                </ul>
             </div>
             <div>
@@ -407,6 +494,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
             </div>
          </div>
       </footer>
+
+      {showReviewModal && <ReviewModal onClose={() => setShowReviewModal(false)} onSubmit={handleReviewSubmit} />}
     </div>
   );
 };
@@ -419,7 +508,7 @@ const FeatureItem: React.FC<{ icon: string; title: string; desc: string }> = ({ 
      </div>
      <div>
         <h3 className="font-bold text-slate-900 text-lg">{title}</h3>
-        <p className="text-slate-500 mt-1 leading-relaxed">{desc}</p>
+        <p className="text-slate-500 mt-1 leading-relaxed text-sm md:text-base">{desc}</p>
      </div>
   </div>
 );
