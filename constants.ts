@@ -1,4 +1,8 @@
+
 export const APP_NAME = "TindaPH";
+
+export const SUPABASE_URL = "https://jyaqoopmtymvwtoaatzb.supabase.co";
+export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5YXFvb3BtdHltdnd0b2FhdHpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5ODU1NDYsImV4cCI6MjA3OTU2MTU0Nn0.FugJEpjasitq4CSexGWh-4JXmxdx8sbz2SfiAvNpS_A";
 
 export const CATEGORIES = [
   "Electronics",

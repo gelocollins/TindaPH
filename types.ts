@@ -81,3 +81,12 @@ export interface LandingStat {
     label: string;
     value: number;
 }
+
+export interface SiteReview {
+    id: string;
+    user_name: string;
+    user_location: string;
+    rating: number;
+    comment: string;
+    created_at: string;
+}

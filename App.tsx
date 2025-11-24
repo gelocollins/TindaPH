@@ -16,13 +16,23 @@ const App: React.FC = () => {
   const [init, setInit] = useState(false);
 
   useEffect(() => {
-    const u = authService.getCurrentUser();
-    setUser(u);
-    setInit(true);
+    // Initial session check is now async with real Supabase
+    const initAuth = async () => {
+        try {
+            const u = await authService.getCurrentUser();
+            setUser(u);
+        } catch (e) {
+            console.error("Auth check failed", e);
+        } finally {
+            setInit(true);
+        }
+    };
+    initAuth();
   }, []);
 
-  const handleLogin = () => {
-    setUser(authService.getCurrentUser());
+  const handleLogin = async () => {
+    const u = await authService.getCurrentUser();
+    setUser(u);
   };
 
   const handleLogout = async () => {

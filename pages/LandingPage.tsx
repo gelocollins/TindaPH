@@ -1,7 +1,8 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { listingService } from '../services/mockSupabase';
-import { Listing, User } from '../types';
+import { Listing, User, SiteReview } from '../types';
 import { ListingCard } from '../components/ListingCard';
 import { CATEGORIES } from '../constants';
 
@@ -75,6 +76,7 @@ interface LandingPageProps {
 const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [trendingItems, setTrendingItems] = useState<Listing[]>([]);
+  const [reviews, setReviews] = useState<SiteReview[]>([]);
   const [activeTab, setActiveTab] = useState<'buyer' | 'seller'>('buyer');
   const navigate = useNavigate();
 
@@ -82,12 +84,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
     // Simulate initial page load animation
     const timer = setTimeout(() => setLoading(false), 1500);
     
-    // Fetch some data for the preview
-    const fetchTrending = async () => {
-      const data = await listingService.getFeed(null);
-      setTrendingItems(data.slice(0, 5));
+    // Fetch data
+    const fetchData = async () => {
+      try {
+        const [data, fetchedReviews] = await Promise.all([
+            listingService.getFeed(null),
+            listingService.getReviews()
+        ]);
+        setTrendingItems(data.slice(0, 5));
+        setReviews(fetchedReviews);
+      } catch (e) {
+        console.error("Landing data fetch error", e);
+      }
     };
-    fetchTrending();
+    fetchData();
 
     return () => clearTimeout(timer);
   }, []);
@@ -103,6 +113,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
       </div>
     );
   }
+
+  // Fallback testimonial if no DB data
+  const featuredReview = reviews.length > 0 ? reviews[0] : {
+      comment: "I sold my old gaming laptop in less than 24 hours. The buyer was just 3 streets away! The AI description tool saved me so much time.",
+      user_name: "Miguel Santos",
+      user_location: "Quezon City",
+      rating: 5
+  };
 
   return (
     <div className="overflow-hidden">
@@ -197,13 +215,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
             </div>
 
             <div className="flex overflow-x-auto gap-6 pb-8 no-scrollbar snap-x snap-mandatory">
-               {trendingItems.map((item, idx) => (
+               {trendingItems.length > 0 ? trendingItems.map((item, idx) => (
                  <div key={item.id} className="min-w-[280px] md:min-w-[300px] snap-center">
                     <Reveal delay={idx * 100}>
                        <ListingCard item={item} />
                     </Reveal>
                  </div>
-               ))}
+               )) : (
+                 <div className="text-gray-400 p-8 text-center w-full">No trending items available yet. Be the first to list!</div>
+               )}
                <div className="min-w-[200px] flex items-center justify-center">
                   <Link to="/explore" className="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center text-blue-600 hover:scale-110 transition">
                      ➔
@@ -311,7 +331,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
          </div>
       </section>
 
-      {/* --- TESTIMONIALS --- */}
+      {/* --- TESTIMONIALS (DYNAMIC FROM SITE_REVIEWS) --- */}
       <section className="py-24 bg-blue-50">
         <div className="max-w-4xl mx-auto px-6 text-center">
            <h2 className="text-3xl font-black text-slate-900 mb-12">Trusted by Pinoys Everywhere 🇵🇭</h2>
@@ -319,15 +339,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ user }) => {
            <div className="relative bg-white p-8 md:p-12 rounded-3xl shadow-xl border border-blue-100">
               <div className="text-4xl text-blue-200 absolute top-8 left-8">“</div>
               <p className="text-xl md:text-2xl text-slate-700 font-medium leading-relaxed relative z-10">
-                 I sold my old gaming laptop in less than 24 hours. The buyer was just 3 streets away! The AI description tool saved me so much time thinking of what to write.
+                 {featuredReview.comment}
               </p>
               <div className="mt-8 flex items-center justify-center gap-4">
-                 <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">M</div>
+                 <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                    {featuredReview.user_name.charAt(0).toUpperCase()}
+                 </div>
                  <div className="text-left">
-                    <p className="font-bold text-slate-900">Miguel Santos</p>
-                    <p className="text-sm text-slate-500">Quezon City • Sold 5 items</p>
+                    <p className="font-bold text-slate-900">{featuredReview.user_name}</p>
+                    <p className="text-sm text-slate-500">{featuredReview.user_location}</p>
                  </div>
               </div>
+              
+              {reviews.length > 1 && (
+                  <p className="text-xs text-gray-400 mt-6">Reading latest review from our community.</p>
+              )}
            </div>
         </div>
       </section>
